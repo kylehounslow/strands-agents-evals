@@ -15,7 +15,6 @@ from strands_evals.types.trace import (
     SpanInfo,
     TextContent,
     ToolCall,
-    ToolCallContent,
     ToolConfig,
     ToolExecutionSpan,
     ToolResult,
@@ -59,9 +58,10 @@ class OpenSearchSessionMapper(SessionMapper):
                     spans.append(InferenceSpan(span_info=span_info, messages=messages, metadata={}))
 
             elif record.operation_name == "execute_tool":
+                arguments = self._parse_json(record.tool_call_arguments)
                 tool_call = ToolCall(
                     name=record.tool_name,
-                    arguments=self._parse_json(record.tool_call_arguments),
+                    arguments=arguments if isinstance(arguments, dict) else {},
                     tool_call_id=record.span_id,
                 )
                 tool_result = ToolResult(
@@ -76,10 +76,11 @@ class OpenSearchSessionMapper(SessionMapper):
                 user_prompt = self._first_message_by_role(record.input_messages, "user")
                 agent_response = self._last_message_by_role(record.output_messages, "assistant")
                 if user_prompt or agent_response:
-                    # Collect tool names from sibling execute_tool spans
+                    # Collect tool names only from direct child spans
                     tool_names = sorted({
                         r.tool_name for r in sorted_records
                         if r.operation_name == "execute_tool" and r.tool_name
+                        and r.parent_span_id == record.span_id
                     })
                     spans.append(AgentInvocationSpan(
                         span_info=span_info,
