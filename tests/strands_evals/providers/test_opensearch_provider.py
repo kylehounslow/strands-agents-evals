@@ -74,6 +74,27 @@ class TestGetEvaluationData:
             provider.get_evaluation_data("sess-1")
 
 
+
+class TestMultipleTraces:
+    def test_spans_from_multiple_traces_are_regrouped(self, provider, mock_retriever):
+        """Spans from multiple TraceRecords are flattened and re-grouped by trace_id."""
+        mock_retriever.get_traces.return_value = MockSessionRecord(
+            traces=[
+                MockTraceRecord(trace_id="t1", spans=[
+                    make_agent_span(trace_id="t1", span_id="a1", user_prompt="Q1", agent_response="A1"),
+                ]),
+                MockTraceRecord(trace_id="t2", spans=[
+                    make_agent_span(trace_id="t2", span_id="a2", user_prompt="Q2", agent_response="A2"),
+                ]),
+            ]
+        )
+
+        result = provider.get_evaluation_data("sess-1")
+        session = result["trajectory"]
+        assert len(session.traces) == 2
+        trace_ids = {t.trace_id for t in session.traces}
+        assert trace_ids == {"t1", "t2"}
+
 class TestExtractOutput:
     def test_extracts_last_agent_response(self, provider, mock_retriever):
         """Output comes from the last AgentInvocationSpan's response."""

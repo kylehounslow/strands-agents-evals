@@ -198,3 +198,85 @@ class TestMultiAgentTraces:
         # Orchestrator has no direct tool children
         orchestrator_tools = [t.name for t in by_id["orchestrator"].available_tools]
         assert orchestrator_tools == []
+
+
+class TestParseTime:
+    """Tests for timestamp parsing edge cases."""
+
+    def test_valid_iso_with_z_suffix(self):
+        from strands_evals.mappers.opensearch_session_mapper import _parse_time
+        dt = _parse_time("2026-01-01T00:00:00Z")
+        assert dt.year == 2026
+        assert dt.tzinfo is not None
+
+    def test_valid_iso_with_offset(self):
+        from strands_evals.mappers.opensearch_session_mapper import _parse_time
+        dt = _parse_time("2026-01-01T00:00:00+00:00")
+        assert dt.year == 2026
+
+    def test_empty_string_returns_epoch(self):
+        from strands_evals.mappers.opensearch_session_mapper import _parse_time
+        dt = _parse_time("")
+        assert dt.year == 1970
+
+    def test_none_returns_epoch(self):
+        from strands_evals.mappers.opensearch_session_mapper import _parse_time
+        dt = _parse_time(None)
+        assert dt.year == 1970
+
+    def test_invalid_string_returns_epoch(self):
+        from strands_evals.mappers.opensearch_session_mapper import _parse_time
+        dt = _parse_time("not-a-date")
+        assert dt.year == 1970
+
+
+class TestMultiAgentTraces:
+    """Tests for multi-agent scenarios where tool attribution matters."""
+
+    def setup_method(self):
+        self.mapper = OpenSearchSessionMapper()
+
+    def test_tool_names_scoped_to_parent_agent(self):
+        """Each AgentInvocationSpan should only list tools that are its children, not all tools in the trace."""
+        records = [
+            make_agent_span(
+                span_id="orchestrator", parent_span_id="",
+                user_prompt="Plan a trip", agent_response="Here's your plan",
+                start_time="2026-01-01T00:00:00Z",
+            ),
+            make_agent_span(
+                span_id="weather-agent", parent_span_id="orchestrator",
+                user_prompt="Get weather", agent_response="Sunny",
+                start_time="2026-01-01T00:00:01Z",
+            ),
+            make_tool_span(
+                span_id="weather-tool", parent_span_id="weather-agent",
+                tool_name="get_weather",
+                start_time="2026-01-01T00:00:01.5Z",
+            ),
+            make_agent_span(
+                span_id="events-agent", parent_span_id="orchestrator",
+                user_prompt="Get events", agent_response="Concert tonight",
+                start_time="2026-01-01T00:00:02Z",
+            ),
+            make_tool_span(
+                span_id="events-tool", parent_span_id="events-agent",
+                tool_name="get_events",
+                start_time="2026-01-01T00:00:02.5Z",
+            ),
+        ]
+        session = self.mapper.map_to_session(records, "sess-1")
+
+        agent_spans = [s for s in session.traces[0].spans if isinstance(s, AgentInvocationSpan)]
+        assert len(agent_spans) == 3
+
+        by_id = {s.span_info.span_id: s for s in agent_spans}
+
+        weather_tools = [t.name for t in by_id["weather-agent"].available_tools]
+        assert weather_tools == ["get_weather"]
+
+        events_tools = [t.name for t in by_id["events-agent"].available_tools]
+        assert events_tools == ["get_events"]
+
+        orchestrator_tools = [t.name for t in by_id["orchestrator"].available_tools]
+        assert orchestrator_tools == []

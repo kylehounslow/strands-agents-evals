@@ -17,15 +17,52 @@ logger = logging.getLogger(__name__)
 
 
 class OpenSearchProvider(TraceProvider):
-    """Retrieves agent traces from OpenSearch via genai-observability-sdk-py."""
+    """Retrieves agent traces from OpenSearch via genai-observability-sdk-py.
+
+    Wraps OpenSearchTraceRetriever to query spans by session (conversation)
+    ID or trace ID and returns Session objects for the evaluation pipeline.
+
+    Example::
+
+        from strands_evals.providers import OpenSearchProvider
+
+        # Basic auth (local / development)
+        provider = OpenSearchProvider(
+            host="https://localhost:9200",
+            auth=("admin", "password"),
+            verify_certs=False,
+        )
+
+        # SigV4 auth (Amazon OpenSearch Service)
+        from opensearchpy import RequestsAWSV4SignerAuth
+        import boto3
+        credentials = boto3.Session().get_credentials()
+        auth = RequestsAWSV4SignerAuth(credentials, "us-east-1", "es")
+        provider = OpenSearchProvider(
+            host="https://my-domain.us-east-1.es.amazonaws.com",
+            auth=auth,
+        )
+    """
 
     def __init__(
         self,
         host: str = "https://localhost:9200",
         index: str = "otel-v1-apm-span-*",
-        auth: "tuple[str, str] | Any | None" = None,
+        auth: Any = None,
         verify_certs: bool = True,
     ):
+        """Initialize the OpenSearch provider.
+
+        Args:
+            host: OpenSearch endpoint URL.
+            index: Index pattern for span documents.
+            auth: Authentication credentials. Accepts a (username, password) tuple
+                for basic auth, a RequestsAWSV4SignerAuth instance for SigV4, or None.
+            verify_certs: Whether to verify TLS certificates.
+
+        Raises:
+            ImportError: If opensearch-genai-observability-sdk-py is not installed.
+        """
         try:
             from opensearch_genai_observability_sdk_py import OpenSearchTraceRetriever
         except ImportError:
@@ -43,6 +80,8 @@ class OpenSearchProvider(TraceProvider):
         """Retrieve traces for a session and return evaluation data."""
         try:
             session_record = self._retriever.get_traces(session_id)
+        except ProviderError:
+            raise
         except Exception as e:
             raise ProviderError(f"Failed to query OpenSearch: {e}") from e
 
