@@ -1,7 +1,14 @@
 """Converters for transforming telemetry data to Session format."""
 
 from .cloudwatch_session_mapper import CloudWatchSessionMapper
+from .opensearch_session_mapper import OpenSearchSessionMapper
 from .session_mapper import SessionMapper
 from .strands_in_memory_session_mapper import GenAIConventionVersion, StrandsInMemorySessionMapper
 
-__all__ = ["CloudWatchSessionMapper", "GenAIConventionVersion", "SessionMapper", "StrandsInMemorySessionMapper"]
+__all__ = [
+    "CloudWatchSessionMapper",
+    "GenAIConventionVersion",
+    "OpenSearchSessionMapper",
+    "SessionMapper",
+    "StrandsInMemorySessionMapper",
+]
