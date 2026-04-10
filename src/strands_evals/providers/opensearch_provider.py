@@ -69,7 +69,7 @@ class OpenSearchProvider(TraceProvider):
             raise ImportError(
                 "opensearch-genai-observability-sdk-py is required. "
                 "Install with: pip install opensearch-genai-observability-sdk-py[opensearch]"
-            )
+            ) from None
 
         self._retriever = OpenSearchTraceRetriever(
             host=host, index=index, auth=auth, verify_certs=verify_certs

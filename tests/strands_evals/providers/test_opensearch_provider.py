@@ -6,8 +6,7 @@ import pytest
 
 from strands_evals.providers.exceptions import ProviderError, SessionNotFoundError
 from strands_evals.providers.opensearch_provider import OpenSearchProvider
-from strands_evals.types.trace import AgentInvocationSpan
-from tests.strands_evals.opensearch_helpers import make_agent_span, make_tool_span, SpanRecord
+from tests.strands_evals.opensearch_helpers import make_agent_span, make_tool_span
 
 
 # Mock the genai-sdk types
